@@ -69,7 +69,7 @@ def main():
 
     with col1:
         input_method = st.radio(
-            "Choose input method:",
+        "Choose input method:",
             ["Text Input", "CSV Upload"]
         )
 
@@ -97,9 +97,9 @@ def main():
         col1, col2 = st.columns([3, 1])
         with col1:
             prompt = st.text_area("Enter your prompt:",
-                                  value=st.session_state.prompt,
-                                  height=200,
-                                  key="prompt_input")
+                                 value=st.session_state.prompt,
+                                 height=200,
+                                 key="prompt_input")
         with col2:
             st.write("")  # Add some space
             st.write("")  # Add more space to align with text area
@@ -184,8 +184,24 @@ def main():
 
                             with col2:
                                 # Add a button to save the current annotations without navigating
-                                if st.button("Save Annotations", on_click=save_current_annotations_callback):
-                                    pass  # The actual saving happens in the callback
+                                # Add a button to save all annotations to a JSON file
+                                if st.button("Save All to JSON"):
+                                    # Generate JSON data
+                                    json_data = generate_json_from_annotations()
+                                    
+                                    if json_data:
+                                        # Convert to JSON string
+                                        json_str = json.dumps(json_data, indent=2)
+                                        
+                                        # Create a download button
+                                        st.download_button(
+                                            label="Download JSON",
+                                            data=json_str,
+                                            file_name=f"prompt_annotations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                            mime="application/json"
+                                        )
+                                    else:
+                                        st.warning("No annotations to save.")
 
                             with col3:
                                 next_button_label = "Next Example" if current_index < num_examples - 1 else "Finish Annotation"
@@ -194,7 +210,10 @@ def main():
 
                             # Display a success message if save was requested
                             if st.session_state.save_requested:
-                                st.success("Annotations saved!")
+                                if hasattr(st.session_state, 'save_message'):
+                                    st.success(st.session_state.save_message)
+                                else:
+                                    st.success("Annotations saved!")
                                 # Reset the flag
                                 st.session_state.save_requested = False
 
@@ -314,7 +333,7 @@ def main():
 
             # Create tabs for each selected dimension
             tabs = st.tabs([next((dim['name'] for dim in VARIATION_DIMENSIONS if dim['id'] == dim_id), dim_id)
-                            for dim_id in st.session_state.selected_dimensions])
+                           for dim_id in st.session_state.selected_dimensions])
 
             # Process each tab
             for i, tab in enumerate(tabs):
@@ -364,8 +383,7 @@ def main():
                     )
 
                     # Button to add the highlight with on_click callback
-                    if st.button("Add Highlight", key=f"add_highlight_{dim_id}", on_click=add_highlight_callback,
-                                 args=(dim_id, dim_info)):
+                    if st.button("Add Highlight", key=f"add_highlight_{dim_id}", on_click=add_highlight_callback, args=(dim_id, dim_info)):
                         st.success(f"Added highlight for {dim_info['name']}")
 
                     # Display current highlights for this dimension
@@ -375,8 +393,7 @@ def main():
                         for j, highlight in enumerate(dim_highlights):
                             col1, col2 = st.columns([3, 1])
                             with col1:
-                                st.text_area(f"Highlight {j + 1}", highlight['text'], height=80,
-                                             key=f"highlight_{dim_id}_{j}", disabled=True)
+                                st.text_area(f"Highlight {j+1}", highlight['text'], height=80, key=f"highlight_{dim_id}_{j}", disabled=True)
                             with col2:
                                 # Define remove callback
                                 def remove_highlight(highlight=highlight):
@@ -385,8 +402,7 @@ def main():
                                             st.session_state.highlights.pop(k)
                                             break
 
-                                if st.button("Remove", key=f"remove_{dim_id}_{j}", on_click=remove_highlight,
-                                             args=(highlight,)):
+                                if st.button("Remove", key=f"remove_{dim_id}_{j}", on_click=remove_highlight, args=(highlight,)):
                                     pass  # The actual removal happens in the callback
 
         # Only show processing UI for single text input mode
@@ -395,16 +411,16 @@ def main():
             st.header("Processing Parameters")
             max_combinations = st.slider("Maximum number of combinations:", 1, 500, 100)
 
-            # Process button
-            process_button = st.button("Generate Variations")
+    # Process button
+    process_button = st.button("Generate Variations")
 
-            if process_button:
-                if not st.session_state.selected_dimensions:
-                    st.warning("Please select at least one dimension to vary.")
-                elif not st.session_state.highlights:
-                    st.warning("Please highlight at least one variation point in your prompt.")
-                else:
-                    with st.spinner("Processing..."):
+    if process_button:
+        if not st.session_state.selected_dimensions:
+            st.warning("Please select at least one dimension to vary.")
+        elif not st.session_state.highlights:
+            st.warning("Please highlight at least one variation point in your prompt.")
+        else:
+            with st.spinner("Processing..."):
                         # In a real implementation, we would use the highlights and dimensions
                         # to generate variations. For now, we'll simulate it with random variations.
 
@@ -432,9 +448,7 @@ def main():
                                         for highlight in dim_highlights:
                                             # Replace with a random example from the dimension
                                             replacement = random.choice(dim_info['examples'])
-                                            var_prompt = var_prompt[:highlight['start']] + replacement + var_prompt[
-                                                                                                         highlight[
-                                                                                                             'end']:]
+                                            var_prompt = var_prompt[:highlight['start']] + replacement + var_prompt[highlight['end']:]
 
                                         variations.append(var_prompt)
 
@@ -459,28 +473,27 @@ def main():
                 for axis_name, variations in st.session_state.variations.items():
                     with st.expander(f"{axis_name} ({len(variations)} variations)"):
                         for i, var in enumerate(variations):
-                            st.text_area(f"Variation {i + 1}", var, height=100, key=f"var_{axis_name}_{i}",
-                                         disabled=True)
+                            st.text_area(f"Variation {i+1}", var, height=100, key=f"var_{axis_name}_{i}", disabled=True)
 
                 # Display combined variations
                 if 'combined_variations' in st.session_state:
                     st.subheader(f"Combined Variations ({len(st.session_state.combined_variations)} total)")
 
-                    # Create a dataframe for easier viewing
-                    df = pd.DataFrame({
+                # Create a dataframe for easier viewing
+                df = pd.DataFrame({
                         "Variation #": range(1, len(st.session_state.combined_variations) + 1),
                         "Text": st.session_state.combined_variations
-                    })
+                })
 
-                    st.dataframe(df)
+                st.dataframe(df)
 
-                    # Download button for results
-                    st.download_button(
-                        label="Download Results as CSV",
-                        data=df.to_csv(index=False).encode('utf-8'),
-                        file_name='prompt_variations.csv',
-                        mime='text/csv',
-                    )
+                # Download button for results
+                st.download_button(
+                    label="Download Results as CSV",
+                    data=df.to_csv(index=False).encode('utf-8'),
+                    file_name='prompt_variations.csv',
+                    mime='text/csv',
+                )
 
     # In the annotation complete section
     if st.session_state.annotation_complete:
@@ -489,31 +502,95 @@ def main():
         # Generate JSON data
         json_data = generate_json_from_annotations()
 
-        # Display the JSON
-        st.subheader("Annotation Results (JSON)")
-        st.json(json_data)
+        # Display the JSON in a more readable format
+        st.subheader("Annotation Results")
 
-        # Save to file and provide download button
-        json_str = json.dumps(json_data, indent=2)
-        st.download_button(
-            label="Download Annotations as JSON",
-            data=json_str,
-            file_name="prompt_annotations.json",
-            mime="application/json"
-        )
+        # Display a summary first
+        st.write(f"**Total examples annotated:** {len(json_data)}")
 
-        # Add a button to return to annotation mode
-        col1, col2 = st.columns(2)
-        with col1:
+        # Create tabs for different views of the data
+        tab1, tab2, tab3 = st.tabs(["Summary View", "JSON View", "Download Options"])
+
+        with tab1:
+            # Display a more user-friendly summary of the annotations
+            for i, example in enumerate(json_data):
+                with st.expander(f"Example {i+1}: {example['prompt'].split('\\n')[0][:50]}..."):
+                    st.write("**Prompt:**")
+                    st.text(example["prompt"])
+
+                    st.write("**Dimensions:**")
+                    for dim_id, dim_data in example["dimensions"].items():
+                        st.write(f"- **{dim_data['name']}**: {len(dim_data['highlights'])} highlights")
+                        for j, highlight in enumerate(dim_data['highlights']):
+                            st.write(f"  - Highlight {j+1}: \"{highlight['text']}\"")
+
+        with tab2:
+            # Display the raw JSON
+            st.json(json_data)
+
+        with tab3:
+            # Provide multiple download options
+            st.write("**Download Options:**")
+
+            # JSON download
+            json_str = json.dumps(json_data, indent=2)
+            st.download_button(
+                label="Download as JSON",
+                data=json_str,
+                file_name="prompt_annotations.json",
+                mime="application/json"
+            )
+
+            # CSV download (flattened version)
+            try:
+                # Create a flattened version for CSV
+                csv_data = []
+                for example in json_data:
+                    for dim_id, dim_data in example["dimensions"].items():
+                        for highlight in dim_data["highlights"]:
+                            csv_data.append({
+                                "prompt": example["prompt"].replace("\n", " ")[:100] + "...",
+                                "dimension": dim_data["name"],
+                                "highlight": highlight["text"],
+                                "start": highlight["start"],
+                                "end": highlight["end"]
+                            })
+
+                if csv_data:
+                    csv_df = pd.DataFrame(csv_data)
+                    st.download_button(
+                        label="Download as CSV",
+                        data=csv_df.to_csv(index=False).encode('utf-8'),
+                        file_name="prompt_annotations.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.warning("No data to export as CSV.")
+            except Exception as e:
+                st.error(f"Error creating CSV: {e}")
+
+            # Add a button to return to annotation mode
             if st.button("Return to Annotation Mode", on_click=return_to_annotation_mode):
                 pass  # The actual return happens in the callback
 
-        with col2:
             # Button to start processing all examples
             if st.button("Process All Examples"):
-                st.info("This would process all examples in the CSV using the annotations as a guide.")
-                # Here you would call your processing function
-                # process_all_examples(json_data, st.session_state.csv_data)
+                # Count total examples in CSV
+                total_examples = len(st.session_state.csv_data) if st.session_state.csv_data is not None else 0
+                # Count annotated examples
+                annotated_count = len(st.session_state.annotated_examples)
+                
+                st.info(f"""
+                This would process all {total_examples} examples in the CSV using the annotations from {annotated_count} examples as a guide.
+                
+                The system would:
+                1. Use the patterns identified in your annotations
+                2. Automatically detect similar patterns in all examples
+                3. Generate variations for each detected pattern
+                4. Create a comprehensive set of prompt variations
+                
+                This feature is not yet implemented in this demo.
+                """)
 
 
 def save_current_annotations():
@@ -592,32 +669,14 @@ def generate_json_from_annotations():
     return json_data
 
 
-def save_json_to_temp_file(json_data):
-    """Save the JSON data to a temporary file and return the path."""
-    # Create a temporary directory if it doesn't exist
-    temp_dir = os.path.join(tempfile.gettempdir(), "prompt_annotations")
-    os.makedirs(temp_dir, exist_ok=True)
-
-    # Create a filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"annotations_{timestamp}.json"
-    filepath = os.path.join(temp_dir, filename)
-
-    # Write the JSON data to the file
-    with open(filepath, 'w') as f:
-        json.dump(json_data, f, indent=2)
-
-    return filepath
-
-
 def get_dimension_color(dim_id):
     """Get a color for a dimension."""
     colors = {
         "enumeration": "#FF9999",  # Brighter red
-        "separator": "#99FF99",  # Brighter green
-        "order": "#9999FF",  # Brighter blue
-        "phrasing": "#FFFF99",  # Brighter yellow
-        "examples": "#FF99FF"  # Brighter purple
+        "separator": "#99FF99",    # Brighter green
+        "order": "#9999FF",        # Brighter blue
+        "phrasing": "#FFFF99",     # Brighter yellow
+        "examples": "#FF99FF"      # Brighter purple
     }
     return colors.get(dim_id, "#CCCCCC")  # Default to light gray
 
@@ -638,7 +697,6 @@ def go_to_previous_example():
     # Load annotations for the new example
     load_annotations_for_current_example()
 
-
 def go_to_next_example(num_examples):
     # Save current annotations
     if st.session_state.highlights:
@@ -657,15 +715,30 @@ def go_to_next_example(num_examples):
     else:
         # Finish annotation
         st.session_state.annotation_complete = True
-        # Generate and save JSON file
-        json_data = generate_json_from_annotations()
-        save_json_to_temp_file(json_data)
-
 
 def save_current_annotations_callback():
+    """Callback for saving annotations with user feedback."""
+    # Set the save requested flag
     st.session_state.save_requested = True
+    
+    # Save the annotations
     save_current_annotations()
-
+    
+    # Count how many highlights were saved
+    current_index = st.session_state.current_example_index
+    highlight_count = 0
+    
+    # Find the saved example
+    for example in st.session_state.annotated_examples:
+        if example.get('index') == current_index:
+            highlight_count = len(example.get('highlights', []))
+            break
+    
+    # Update the save message with more details
+    if highlight_count > 0:
+        st.session_state.save_message = f"Saved {highlight_count} highlights for example {current_index + 1}."
+    else:
+        st.session_state.save_message = "No highlights to save for this example."
 
 def edit_selected_example(selected_example):
     # Save current annotations if we're in the middle of annotating
@@ -680,7 +753,6 @@ def edit_selected_example(selected_example):
 
     # If we were in complete state, go back to annotation mode
     st.session_state.annotation_complete = False
-
 
 def return_to_annotation_mode():
     st.session_state.annotation_complete = False
